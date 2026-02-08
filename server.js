@@ -1,3 +1,4 @@
+https://tgju-fetcher.onrender.com/rates?force=1
 const express = require("express");
 import express from "express";
 
