@@ -5,7 +5,8 @@ const VERSION = "2026-02-08-1";
 const app = express();
 
 const PORT = process.env.PORT || 3000;
-const TGJU_JSON_URL = "https://call2.tgju.org/ajax.json";
+const TGJU_JSON_URL = "
+https://call4.tgju.org/ajax.json?rev=h6zCp2HFLRblUxAM2G0Hd8Ld2SCH8gTEMspzWSiRC0idADwTK6O10X2yKhnk";
 
 // Cache
 const CACHE_SECONDS = Number(process.env.CACHE_SECONDS || 60);
