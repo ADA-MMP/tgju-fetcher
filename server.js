@@ -137,8 +137,9 @@ function normalizeEntry(key, item) {
   num(item?.last) ??
   num(item);
 
-  const low = num(item?.tolerance_low) ?? null;
-  const high = num(item?.tolerance_high) ?? null;
+  const low = num(item?.tolerance_low) ?? num(item?.low) ?? num(item?.l) ?? null;
+const high = num(item?.tolerance_high) ?? num(item?.high) ?? num(item?.h) ?? null;
+
 
   return {
     code: key,
