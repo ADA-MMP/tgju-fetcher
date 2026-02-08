@@ -129,7 +129,14 @@ function isFiatKey(key) {
 }
 
 function normalizeEntry(key, item) {
-  const price = num(item?.current) ?? num(item?.price) ?? num(item) ?? 0;
+  const price =
+  num(item?.current) ??
+  num(item?.p) ??
+  num(item?.price) ??
+  num(item?.value) ??
+  num(item?.last) ??
+  num(item);
+
   const low = num(item?.tolerance_low) ?? null;
   const high = num(item?.tolerance_high) ?? null;
 
