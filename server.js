@@ -16,15 +16,37 @@ function isObj(x) {
   return x && typeof x === "object" && !Array.isArray(x);
 }
 
+function digitsToEnglish(s) {
+  // Persian + Arabic digits -> English digits
+  const fa = ["۰","۱","۲","۳","۴","۵","۶","۷","۸","۹"];
+  const ar = ["٠","١","٢","٣","٤","٥","٦","٧","٨","٩"];
+  let out = String(s);
+  for (let i = 0; i < 10; i++) {
+    out = out.replaceAll(fa[i], String(i));
+    out = out.replaceAll(ar[i], String(i));
+  }
+  return out;
+}
+
 function num(v) {
   if (v === null || v === undefined) return null;
+
   if (typeof v === "number") return Number.isFinite(v) ? v : null;
-  if (typeof v !== "string") return null;
-  const cleaned = v.replace(/,/g, "").trim();
-  if (!cleaned) return null;
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : null;
+
+  if (typeof v === "string") {
+    let cleaned = v.trim();
+    if (!cleaned) return null;
+
+    cleaned = digitsToEnglish(cleaned);
+    cleaned = cleaned.replace(/,/g, ""); // remove commas
+
+    const n = Number(cleaned);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  return null;
 }
+
 
 function safeStr(v) {
   return typeof v === "string" ? v : "";
