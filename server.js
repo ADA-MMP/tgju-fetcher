@@ -1,4 +1,4 @@
-https://tgju-fetcher.onrender.com/rates?force=1
+const VERSION = "2026-02-08-1";
 const express = require("express");
 import express from "express";
 
