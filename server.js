@@ -462,7 +462,11 @@ app.get("/rates", async (req, res) => {
 
   if (!data.ok) {
     return res.json({
-      ok: false,
+      ok: false
+
+        version: VERSION,
+
+      
       fetched_at: data.fetched_at,
       source: data.source,
       http_code: data.http_code,
@@ -489,6 +493,9 @@ app.get("/debug/codes", async (req, res) => {
   // return only one group OR all groups
   if (group === "fiat" || group === "crypto" || group === "gold") {
     return res.json({
+
+      version: VERSION,
+      
       ok: true,
       fetched_at: data.fetched_at,
       source: data.source,
