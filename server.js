@@ -108,20 +108,11 @@ function isFiatKey(key) {
   const k = key.toLowerCase();
   if (!k.startsWith("price_")) return false;
 
-  // exclude crypto + gold
   if (isCryptoKey(k)) return false;
   if (isGoldKey(k)) return false;
 
-  const after = k.slice(6);
-
-  // common special fiat keys
-  if (
-    after === "dollar_rl" ||
-    after === "dollar_ex" ||
-    after === "dollar_dt" ||
-    after === "eur" ||
-    after === "gbp"
-  ) return true;
+  return true; // everything else is fiat
+}
 
   // typical fiat codes: price_cad, price_try, price_aed ...
   if (/^[a-z]{3}$/.test(after)) return true;
