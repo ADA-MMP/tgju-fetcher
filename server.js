@@ -39,7 +39,6 @@ const SPECIAL_CODE_MAP = {
 };
 
 const FA_NAME_MAP = {
-  // already have (keep yours)
   usd: "دلار آمریکا",
   eur: "یورو",
   gbp: "پوند انگلیس",
@@ -55,6 +54,19 @@ const FA_NAME_MAP = {
   jpy: "ین ژاپن",
   chf: "فرانک سوئیس",
   rub: "روبل روسیه",
+  aud: "دلار استرالیا",
+  nzd: "دلار نیوزیلند",
+  sek: "کرون سوئد",
+  nok: "کرون نروژ",
+  dkk: "کرون دانمارک",
+  inr: "روپیه هند",
+  krw: "وون کره جنوبی",
+  myr: "رینگیت مالزی",
+  thb: "بات تایلند",
+  php: "پزوی فیلیپین",
+  mxn: "پزو مکزیک",
+  brl: "رئال برزیل",
+  zar: "رند آفریقای جنوبی",
 
   // from your TGJU list (ISO codes)
   all: "لک آلبانی",
@@ -106,7 +118,6 @@ const FA_NAME_MAP = {
   npr: "روپیه نپال",
   pab: "بولبوئا پاناما",
   pgk: "کینا پاپوا گینه نو",
-  php: "پزوی فیلیپین",
   ron: "لئو رومانی",
   rsd: "دینار صربستان",
   rwf: "فرانک رواندا",
@@ -153,20 +164,6 @@ const FA_NAME_MAP = {
   ang: "آنتیل گیلدر هلند",
   stn: "دوبرا سائوتومه و پرنسیپ",
   xcd: "دلار کارائیب شرقی",
-
-  // you already had these (keep)
-  aud: "دلار استرالیا",
-  nzd: "دلار نیوزیلند",
-  sek: "کرون سوئد",
-  nok: "کرون نروژ",
-  dkk: "کرون دانمارک",
-  inr: "روپیه هند",
-  krw: "وون کره جنوبی",
-  myr: "رینگیت مالزی",
-  thb: "بات تایلند",
-  mxn: "پزو مکزیک",
-  brl: "رئال برزیل",
-  zar: "رند آفریقای جنوبی",
 };
 
 // Currency -> country code (for flag emoji)
@@ -199,9 +196,6 @@ const CURRENCY_TO_COUNTRY = {
   mxn: "MX",
   brl: "BR",
   zar: "ZA",
-
-  const CURRENCY_TO_COUNTRY = {
-  // keep your existing...
 
   all: "AL",
   bbd: "BB",
@@ -292,14 +286,14 @@ const CURRENCY_TO_COUNTRY = {
   vuv: "VU",
   kgs: "KG",
   mru: "MR",
-  ang: "CW", // best-effort (Antillean; could be CW/SX)
-  stn: "ST",
-  xcd: "AG", // best-effort (multi-country currency)
-  xof: "SN", // best-effort (multi-country currency)
-  xaf: "CM", // best-effort (multi-country currency)
-  xpf: "PF", // best-effort (multi-territory)
 
-  
+  // best-effort (multi-country currencies / territories)
+  ang: "CW",
+  stn: "ST",
+  xcd: "AG",
+  xof: "SN",
+  xaf: "CM",
+  xpf: "PF",
 };
 
 // -----------------------------
@@ -341,7 +335,6 @@ function pickTs(item) {
   return ts.trim() !== "" ? ts.trim() : new Date().toISOString();
 }
 
-// Parse "usd, eur, aed" -> Set(["usd","eur","aed"])
 function parseSymbolsParam(value) {
   if (!value) return null;
   const arr = String(value)
@@ -353,7 +346,6 @@ function parseSymbolsParam(value) {
 
 function baseCurrency(code) {
   const c = String(code).toLowerCase().trim();
-  // usd_official -> usd
   return c.split("_")[0] || c;
 }
 
@@ -372,7 +364,6 @@ function flagForCurrency(code) {
 }
 
 function tgjuKeyToCode(priceKey) {
-  // price_dollar_rl -> dollar_rl -> usd
   const raw = String(priceKey).replace(/^price_/, "").toLowerCase();
   return SPECIAL_CODE_MAP[raw] || raw;
 }
@@ -435,18 +426,15 @@ function isGoldKey(key) {
 function isCryptoKey(key) {
   const k = key.toLowerCase();
 
-  // pairs like btc-irr, usdt-irr, btc_irr
   if (k.endsWith("-irr") || k.endsWith("_irr")) {
     return CRYPTO_KEYWORDS.some((c) => k.startsWith(c));
   }
 
-  // price_btc / price_eth style
   if (k.startsWith("price_")) {
     const sym = k.slice("price_".length);
     return CRYPTO_KEYWORDS.includes(sym);
   }
 
-  // contains known crypto tokens
   return CRYPTO_KEYWORDS.some(
     (c) => k === c || k.includes(`${c}-`) || k.includes(`${c}_`)
   );
@@ -455,12 +443,8 @@ function isCryptoKey(key) {
 function isFiatKey(key) {
   const k = key.toLowerCase();
   if (!k.startsWith("price_")) return false;
-
-  // exclude crypto + gold
   if (isCryptoKey(k)) return false;
   if (isGoldKey(k)) return false;
-
-  // If it's price_* and not crypto/gold -> fiat
   return true;
 }
 
@@ -471,7 +455,6 @@ function normalizeEntry(priceKey, item) {
   const code = tgjuKeyToCode(priceKey);
   const base = baseCurrency(code);
 
-  // TGJU commonly uses current / tolerance_low / tolerance_high
   const price =
     num(item?.current) ?? num(item?.price) ?? num(item?.p) ?? num(item);
 
@@ -481,7 +464,6 @@ function normalizeEntry(priceKey, item) {
   const high =
     num(item?.tolerance_high) ?? num(item?.high) ?? num(item?.h) ?? null;
 
-  // Candidate text fields
   const rawName =
     safeString(item?.name) ||
     safeString(item?.title) ||
@@ -493,24 +475,16 @@ function normalizeEntry(priceKey, item) {
     safeString(item?.s) ||
     "";
 
-  // NEVER allow numeric "name/label"
   const safeRawName = isNumericLike(rawName) ? "" : rawName.trim();
   const safeRawLabel = isNumericLike(rawLabel) ? "" : rawLabel.trim();
 
-  // Prefer Persian name map (code or base)
   const fa = FA_NAME_MAP[code] || FA_NAME_MAP[base] || "";
-
-  // Final name priority (never numeric):
-  // 1) Persian map
-  // 2) TGJU name
-  // 3) TGJU label
-  // 4) CODE
   const name = fa || safeRawName || safeRawLabel || code.toUpperCase();
 
   return {
     code,
     name,
-    label: name, // ✅ label always a name, never amount
+    label: name,
     flag: flagForCurrency(code),
     country: CURRENCY_TO_COUNTRY[base] || null,
     price: price ?? 0,
@@ -636,13 +610,6 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true, version: VERSION, time: new Date().toISOString() });
 });
 
-/**
- * GET /rates
- * Query:
- *  - group=fiat|crypto|gold|all   (default: all)
- *  - symbols=usd,eur,aed          (optional filter)
- *  - force=1                      (force refresh)
- */
 app.get("/rates", async (req, res) => {
   const force = req.query.force === "1" || req.query.force === "true";
   const group = String(req.query.group || "all").toLowerCase();
@@ -682,7 +649,6 @@ app.get("/rates", async (req, res) => {
     });
   }
 
-  // group=all
   const fiat = filterBySymbols(cache.groups.fiat, symbolsSet);
   const crypto = filterBySymbols(cache.groups.crypto, symbolsSet);
   const gold = filterBySymbols(cache.groups.gold, symbolsSet);
@@ -699,10 +665,6 @@ app.get("/rates", async (req, res) => {
   });
 });
 
-/**
- * GET /codes?group=fiat|crypto|gold&force=1
- * Returns only the list of codes for that group.
- */
 app.get("/codes", async (req, res) => {
   const force = req.query.force === "1" || req.query.force === "true";
   const group = String(req.query.group || "").toLowerCase();
@@ -744,10 +706,6 @@ app.get("/codes", async (req, res) => {
   });
 });
 
-/**
- * Optional debug endpoint (first N items in a group)
- * GET /debug/sample?group=fiat&n=20&force=1
- */
 app.get("/debug/sample", async (req, res) => {
   const force = req.query.force === "1" || req.query.force === "true";
   const group = String(req.query.group || "fiat").toLowerCase();
