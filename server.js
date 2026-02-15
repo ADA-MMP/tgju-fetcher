@@ -1,19 +1,23 @@
 /**
  * server.js — TGJU Fetcher (Express)
  * - Fetches https://call2.tgju.org/ajax.json
- * - Normalizes TGJU keys to clean codes (e.g. DOLLAR_RL -> USD)
+ * - Normalizes TGJU keys to clean codes (e.g. price_dollar_rl -> usd)
  * - Classifies into: fiat / crypto / gold
- * - Endpoints:
- *    GET /health
- *    GET /rates?group=fiat|crypto|gold|all&symbols=usd,eur,aed&force=1
- *    GET /codes?group=fiat|crypto|gold&force=1
+ * - Ensures label/name are NEVER numeric (so WP "نام" never shows amount)
+ * - Adds flag emoji + country code for fiat
+ *
+ * Endpoints:
+ *   GET /health
+ *   GET /rates?group=fiat|crypto|gold|all&symbols=usd,eur,aed&force=1
+ *   GET /codes?group=fiat|crypto|gold&force=1
+ *   GET /debug/sample?group=fiat&n=20&force=1
  *
  * Works on Node 18+ (uses global fetch)
  */
 
 "use strict";
 
-const VERSION = "2026-02-15-1";
+const VERSION = "2026-02-15-2";
 
 const express = require("express");
 const app = express();
@@ -27,15 +31,14 @@ const CACHE_TTL_MS = Number(process.env.CACHE_TTL_MS || 60_000);
 // -----------------------------
 const SPECIAL_CODE_MAP = {
   // TGJU special fiat keys
-  dollar_rl: "usd", // ✅ USD free market  (your requirement)
+  dollar_rl: "usd", // ✅ USD free market
   dollar_ex: "usd_official",
   dollar_dt: "usd_dt",
   dollar_sm: "usd_sm",
-
   eur_ex: "eur_official",
 };
 
-// Optional Persian titles override (for nicer display in WP)
+// Optional Persian titles override
 const FA_NAME_MAP = {
   usd: "دلار آمریکا",
   eur: "یورو",
@@ -52,9 +55,22 @@ const FA_NAME_MAP = {
   jpy: "ین ژاپن",
   chf: "فرانک سوئیس",
   rub: "روبل روسیه",
+  aud: "دلار استرالیا",
+  nzd: "دلار نیوزیلند",
+  sek: "کرون سوئد",
+  nok: "کرون نروژ",
+  dkk: "کرون دانمارک",
+  inr: "روپیه هند",
+  krw: "وون کره جنوبی",
+  myr: "رینگیت مالزی",
+  thb: "بات تایلند",
+  php: "پزو فیلیپین",
+  mxn: "پزو مکزیک",
+  brl: "رئال برزیل",
+  zar: "رند آفریقای جنوبی",
 };
 
-// Currency -> country code (for flag emoji in WP)
+// Currency -> country code (for flag emoji)
 const CURRENCY_TO_COUNTRY = {
   usd: "US",
   eur: "EU",
@@ -71,6 +87,19 @@ const CURRENCY_TO_COUNTRY = {
   jpy: "JP",
   chf: "CH",
   rub: "RU",
+  aud: "AU",
+  nzd: "NZ",
+  sek: "SE",
+  nok: "NO",
+  dkk: "DK",
+  inr: "IN",
+  krw: "KR",
+  myr: "MY",
+  thb: "TH",
+  php: "PH",
+  mxn: "MX",
+  brl: "BR",
+  zar: "ZA",
 };
 
 // -----------------------------
@@ -120,6 +149,26 @@ function parseSymbolsParam(value) {
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
   return arr.length ? new Set(arr) : null;
+}
+
+function baseCurrency(code) {
+  const c = String(code).toLowerCase().trim();
+  // usd_official -> usd
+  return c.split("_")[0] || c;
+}
+
+function countryToFlagEmoji(cc) {
+  if (!cc || typeof cc !== "string" || cc.length !== 2) return "";
+  const codePoints = [...cc.toUpperCase()].map(
+    (ch) => 0x1f1e6 + (ch.charCodeAt(0) - 65)
+  );
+  return String.fromCodePoint(...codePoints);
+}
+
+function flagForCurrency(code) {
+  const base = baseCurrency(code);
+  const cc = CURRENCY_TO_COUNTRY[base];
+  return cc ? countryToFlagEmoji(cc) : "";
 }
 
 function tgjuKeyToCode(priceKey) {
@@ -211,22 +260,7 @@ function isFiatKey(key) {
   if (isCryptoKey(k)) return false;
   if (isGoldKey(k)) return false;
 
-  const after = k.slice("price_".length);
-
-  // common special fiat keys
-  if (
-    after === "dollar_rl" ||
-    after === "dollar_ex" ||
-    after === "dollar_dt" ||
-    after === "dollar_sm" ||
-    after === "eur" ||
-    after === "gbp"
-  )
-    return true;
-
-  // Most fiat currencies are ISO codes (usd, eur, cad, ...)
-  // If it's price_XXX and not crypto/gold, treat as fiat.
-  // (TGJU includes lots of fiat codes: price_aud, price_sek, etc.)
+  // If it's price_* and not crypto/gold -> fiat
   return true;
 }
 
@@ -235,6 +269,7 @@ function isFiatKey(key) {
 // -----------------------------
 function normalizeEntry(priceKey, item) {
   const code = tgjuKeyToCode(priceKey);
+  const base = baseCurrency(code);
 
   // TGJU commonly uses current / tolerance_low / tolerance_high
   const price =
@@ -246,8 +281,7 @@ function normalizeEntry(priceKey, item) {
   const high =
     num(item?.tolerance_high) ?? num(item?.high) ?? num(item?.h) ?? null;
 
-  // Best-effort human name:
-  // Some TGJU fields can be confusing; we ensure "label" is NOT numeric.
+  // Candidate text fields
   const rawName =
     safeString(item?.name) ||
     safeString(item?.title) ||
@@ -256,18 +290,29 @@ function normalizeEntry(priceKey, item) {
 
   const rawLabel =
     safeString(item?.label) ||
-    safeString(item?.p) ||
     safeString(item?.s) ||
     "";
 
-  const name = FA_NAME_MAP[code] || rawName || (isNumericLike(rawLabel) ? "" : rawLabel) || code.toUpperCase();
+  // NEVER allow numeric "name/label"
+  const safeRawName = isNumericLike(rawName) ? "" : rawName.trim();
+  const safeRawLabel = isNumericLike(rawLabel) ? "" : rawLabel.trim();
 
-  const label = name; // ✅ keep label as name (not amount)
+  // Prefer Persian name map (code or base)
+  const fa = FA_NAME_MAP[code] || FA_NAME_MAP[base] || "";
+
+  // Final name priority (never numeric):
+  // 1) Persian map
+  // 2) TGJU name
+  // 3) TGJU label
+  // 4) CODE
+  const name = fa || safeRawName || safeRawLabel || code.toUpperCase();
 
   return {
     code,
     name,
-    label,
+    label: name, // ✅ label always a name, never amount
+    flag: flagForCurrency(code),
+    country: CURRENCY_TO_COUNTRY[base] || null,
     price: price ?? 0,
     change: safeString(item?.diff) || safeString(item?.change) || "0",
     low,
@@ -501,7 +546,7 @@ app.get("/codes", async (req, res) => {
 
 /**
  * Optional debug endpoint (first N items in a group)
- * GET /debug/sample?group=fiat&n=20
+ * GET /debug/sample?group=fiat&n=20&force=1
  */
 app.get("/debug/sample", async (req, res) => {
   const force = req.query.force === "1" || req.query.force === "true";
